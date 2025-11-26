@@ -1,0 +1,15 @@
+/docs/
+**/.env
+
+**/.venv/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.vscode/
+**/.idea/
+**/.DS_Store/
+
+**/__pycache__/
+
+/frontend/dist/
+/frontend/dist-ssr/
+/frontend/*.local

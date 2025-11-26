@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  mongo-twitter:
+    image: mongo:6.0
+    container_name: twitter-mongo
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-twitter-data:/data/db
+
+  mongo-biz:
+    image: mongo:6.0
+    container_name: biz-mongo
+    ports:
+      - '27018:27017'
+    volumes:
+      - mongo-biz-data:/data/db
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      - SECRET_KEY=change-me-secret
+      - MONGO_TWITTER_URI=mongodb://mongo-twitter:27017
+      - MONGO_BIZ_URI=mongodb://mongo-biz:27017
+      - MONGO_TWITTER_DB=twitter_data
+      - MONGO_BIZ_DB=biz_meta
+      - DEFAULT_ADMIN_USERNAME=admin
+      - DEFAULT_ADMIN_PASSWORD=ChangeMe123!
+    ports:
+      - '8000:8000'
+    depends_on:
+      - mongo-twitter
+      - mongo-biz
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      - VITE_API_BASE_URL=http://backend:8000
+    ports:
+      - '5173:5173'
+    depends_on:
+      - backend
+
+volumes:
+  mongo-twitter-data:
+  mongo-biz-data:
+
