@@ -322,7 +322,7 @@ export const PublicVisualization = () => {
                             >
                               <div className="topic-detail-header">
                                 <strong className="topic-detail-title">{topic.topic}</strong>
-                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                <div className="topic-detail-meta">
                                   {topic.sentiment && (
                                     <span className={`badge badge-small badge-sentiment badge-${topic.sentiment}`}>
                                       {topic.sentiment}

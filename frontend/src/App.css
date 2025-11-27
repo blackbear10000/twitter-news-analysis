@@ -384,7 +384,20 @@ aside {
   box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.2);
 }
 
-.topic-detail-header,
+.topic-detail-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.topic-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .person-detail-header {
   display: flex;
   justify-content: space-between;
