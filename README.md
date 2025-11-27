@@ -82,7 +82,7 @@ Environment variables (can be placed in `frontend/.env`):
 | `VITE_PREVIEW_PORT` | Frontend preview server port | `4173` |
 | `VITE_PREVIEW_HOST` | Frontend preview server host | `localhost` |
 | `VITE_API_BASE_URL` | Backend API base URL | `http://localhost:8000` |
-| `VITE_ALLOWED_HOSTS` | Comma-separated list of hostnames allowed to access the dev server (e.g. `news.snzdata.com,localhost`) | _(empty)_ |
+| `VITE_ALLOWED_HOSTS` | Comma-separated list of hostnames allowed to access the dev server (e.g. `yourdomain.com,localhost`) | _(empty)_ |
 
 **Note**: Vite recognizes `PORT` environment variable by default. You can use either `PORT` or `VITE_PORT` to configure the dev server port.
 
@@ -95,8 +95,8 @@ cd frontend
 PORT=6000 pm2 start ./node_modules/vite/bin/vite.js --name frontend-dev -- \
   --host 0.0.0.0 --port ${PORT}
 
-# allow custom hostnames (e.g. news.snzdata.com)
-PORT=6000 VITE_ALLOWED_HOSTS="news.snzdata.com,localhost" pm2 restart frontend-dev
+# allow custom hostnames (e.g. yourdomain.com)
+PORT=6000 VITE_ALLOWED_HOSTS="yourdomain.com,localhost" pm2 restart frontend-dev
 ```
 
 Stopping the PM2 process will now terminate the Vite server cleanly.  
