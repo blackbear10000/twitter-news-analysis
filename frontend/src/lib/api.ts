@@ -222,6 +222,8 @@ export interface InsightSnapshot {
   edges: GraphEdge[]
   raw_data_summary?: string | null
   created_at: string
+  is_public?: boolean
+  report_type?: string
 }
 
 export const triggerAnalysis = async (lineId: string, hours: number = 24) => {
@@ -245,6 +247,76 @@ export const fetchPublicSnapshots = async (params?: {
   const { data } = await publicApiClient.get<InsightSnapshot[]>('/api/public/insights/snapshots', {
     params,
   })
+  return data
+}
+
+// Historical Reports
+export interface HistoricalReport {
+  id: string
+  business_line_id: string
+  business_line_name?: string | null
+  selected_user_ids: string[]
+  start_date: string
+  end_date: string
+  topics: TopicSummary[]
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  raw_data_summary?: string | null
+  created_at: string
+}
+
+export interface HistoricalReportCreate {
+  business_line_id: string
+  selected_user_ids: string[]
+  start_date: string
+  end_date: string
+}
+
+export interface FilterTweetsRequest {
+  twitter_ids: string[]
+  start_date: string
+  end_date: string
+  skip?: number
+  limit?: number
+}
+
+export const filterTweets = async (payload: FilterTweetsRequest) => {
+  const { data } = await apiClient.post<TweetListResponse>('/api/tweets/filter', payload, {
+    params: {
+      skip: payload.skip || 0,
+      limit: payload.limit || 1000,
+    },
+  })
+  return data
+}
+
+export const generateHistoricalReport = async (payload: HistoricalReportCreate) => {
+  const { data } = await apiClient.post<InsightSnapshot>('/api/insights/reports/generate', payload)
+  return data
+}
+
+export const fetchHistoricalReports = async (params?: {
+  business_line_id?: string
+  limit?: number
+}) => {
+  const { data } = await apiClient.get<InsightSnapshot[]>('/api/insights/reports', {
+    params,
+  })
+  return data
+}
+
+export const deleteHistoricalReport = async (reportId: string) => {
+  await apiClient.delete(`/api/insights/reports/${reportId}`)
+}
+
+export const updateSnapshotVisibility = async (reportId: string, isPublic: boolean) => {
+  const { data } = await apiClient.put<InsightSnapshot>(
+    `/api/insights/reports/${reportId}/visibility`,
+    null,
+    {
+      params: { is_public: isPublic },
+    }
+  )
   return data
 }
 

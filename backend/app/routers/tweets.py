@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 
 from ..core.deps import get_current_user
 from ..schemas.tweet import TweetListResponse, TweetRecord
@@ -106,6 +106,40 @@ async def get_user_tweets(
         start = end - timedelta(hours=hours)
     total, docs = await twitter_service.fetch_user_tweets(
         twitter_id, start, end, skip=skip, limit=limit, tweet_type=tweet_type
+    )
+    records = [_to_tweet_record(doc, "") for doc in docs]
+    return TweetListResponse(total=total, records=records)
+
+
+@router.post("/filter", response_model=TweetListResponse)
+async def filter_tweets_by_users_and_date(
+    twitter_ids: List[str] = Body(..., description="List of Twitter user IDs to filter"),
+    start_date: datetime = Body(..., description="Start date (ISO format)"),
+    end_date: datetime = Body(..., description="End date (ISO format)"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(1000, ge=0, le=5000, description="Limit number of results. 0 means no limit."),
+    twitter_service: TwitterDataService = Depends(TwitterDataService),
+):
+    """Filter tweets by multiple users and date range."""
+    if not twitter_ids:
+        return TweetListResponse(total=0, records=[])
+    
+    if start_date >= end_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Start date must be before end date"
+        )
+    
+    # Check date range (max 7 days)
+    days_diff = (end_date - start_date).total_seconds() / (24 * 60 * 60)
+    if days_diff > 7:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Date range cannot exceed 7 days"
+        )
+    
+    total, docs = await twitter_service.fetch_tweets(
+        twitter_ids, start_date, end_date, skip=skip, limit=limit
     )
     records = [_to_tweet_record(doc, "") for doc in docs]
     return TweetListResponse(total=total, records=records)

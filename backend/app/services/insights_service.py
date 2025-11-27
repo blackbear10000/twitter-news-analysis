@@ -53,6 +53,22 @@ class InsightsService:
 
         return await self._generate_simple_insights(docs)
 
+    async def generate_insights_for_tweets(
+        self, docs: List[Dict], member_descriptions: Dict[str, str], use_llm: bool = True
+    ) -> InsightsResponse:
+        """Generate insights for a given list of tweets (used for historical reports)."""
+        if not docs:
+            return InsightsResponse(topics=[], nodes=[], edges=[])
+
+        if use_llm:
+            try:
+                return await self._generate_llm_insights(docs, member_descriptions)
+            except Exception as e:
+                print(f"LLM analysis failed, using fallback: {e}")
+                return await self._generate_simple_insights(docs)
+
+        return await self._generate_simple_insights(docs)
+
     async def _generate_llm_insights(
         self, docs: List[Dict], member_descriptions: Dict[str, str]
     ) -> InsightsResponse:

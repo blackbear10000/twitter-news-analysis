@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Routes, Route, Link, useLocation } from 'react-router-dom'
 
 import './App.css'
 import { BusinessLineSidebar } from './components/BusinessLineSidebar'
 import { LoginForm } from './components/LoginForm'
 import { MemberList } from './components/MemberList'
 import { UserTweetView } from './components/UserTweetView'
+import { ReportGenerator } from './components/ReportGenerator'
+import { ReportList } from './components/ReportList'
 import {
   type BusinessLinePayload,
   type Member,
@@ -25,6 +28,7 @@ import {
 import { useAuthStore } from './store/useAuthStore'
 
 function AdminApp() {
+  const location = useLocation()
   const token = useAuthStore((state) => state.token)
   const selectedLineId = useAuthStore((state) => state.businessLineId)
   const setBusinessLineId = useAuthStore((state) => state.setBusinessLineId)
@@ -208,6 +212,10 @@ function AdminApp() {
     )
   }
 
+  const isManagementPage = location.pathname === '/admin' || location.pathname === '/admin/'
+  const isReportGeneratorPage = location.pathname === '/admin/reports/generate'
+  const isReportListPage = location.pathname === '/admin/reports'
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -216,75 +224,106 @@ function AdminApp() {
           <p>Manage business lines and Twitter users</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          {selectedLineId && (
-            <button
-              className="primary-button"
-              type="button"
-              onClick={handleTriggerAnalysis}
-              disabled={triggerAnalysisMutation.isPending}
+          <nav style={{ display: 'flex', gap: '1rem' }}>
+            <Link
+              to="/admin"
+              style={{
+                textDecoration: 'none',
+                color: isManagementPage ? '#3b82f6' : '#666',
+                fontWeight: isManagementPage ? 'bold' : 'normal',
+              }}
             >
-              {triggerAnalysisMutation.isPending ? 'Generating...' : 'Generate Analysis'}
-            </button>
-          )}
+              Management
+            </Link>
+            <Link
+              to="/admin/reports/generate"
+              style={{
+                textDecoration: 'none',
+                color: isReportGeneratorPage ? '#3b82f6' : '#666',
+                fontWeight: isReportGeneratorPage ? 'bold' : 'normal',
+              }}
+            >
+              Generate Analysis
+            </Link>
+            <Link
+              to="/admin/reports"
+              style={{
+                textDecoration: 'none',
+                color: isReportListPage ? '#3b82f6' : '#666',
+                fontWeight: isReportListPage ? 'bold' : 'normal',
+              }}
+            >
+              Analysis Management
+            </Link>
+          </nav>
           <button className="link-button" type="button" onClick={logout}>
             Logout
           </button>
         </div>
       </header>
-      <div className="app-body admin-layout">
-        <div className="admin-left-panel">
-          <BusinessLineSidebar
-            lines={businessLinesQuery.data ?? []}
-            selectedId={selectedLineId}
-            onSelect={setBusinessLineId}
-            onCreate={(payload) => saveLineMutation.mutate(payload as BusinessLinePayload)}
-            onDelete={(id) => deleteLineMutation.mutate(id)}
-            isBusy={saveLineMutation.isPending || deleteLineMutation.isPending}
-          />
-          {selectedLineId && (
-            <MemberList
-              members={membersQuery.data ?? []}
-              selectedMemberId={selectedMember?.id || null}
-              onSelect={setSelectedMember}
-              onCreate={handleCreateMember}
-              onUpdate={handleUpdateMember}
-              onDelete={handleDeleteMember}
-              onUpdateCount={handleUpdateMemberCount}
-              onUpdateAllCounts={handleUpdateAllMembersCount}
-              isBusy={
-                createMemberMutation.isPending ||
-                updateMemberMutation.isPending ||
-                deleteMemberMutation.isPending
-              }
-            />
-          )}
-        </div>
-        <main className="admin-main-content">
-          <UserTweetView
-            tweets={userTweetsQuery.data?.records ?? []}
-            total={userTweetsQuery.data?.total ?? 0}
-            username={selectedMember?.twitter_id}
-            range={timelineRange}
-            onRangeChange={(value) => {
-              setTimelineRange(value)
-              setTimelinePage(1)
-            }}
-            typeFilter={timelineType}
-            onTypeFilterChange={(value) => {
-              setTimelineType(value)
-              setTimelinePage(1)
-            }}
-            page={timelinePage}
-            onPageChange={setTimelinePage}
-            pageSize={timelinePageSize}
-            onPageSizeChange={(value) => {
-              setTimelinePageSize(value)
-              setTimelinePage(1)
-            }}
-            isLoading={userTweetsQuery.isLoading || userTweetsQuery.isFetching}
-          />
-        </main>
-      </div>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <div className="app-body admin-layout">
+              <div className="admin-left-panel">
+                <BusinessLineSidebar
+                  lines={businessLinesQuery.data ?? []}
+                  selectedId={selectedLineId}
+                  onSelect={setBusinessLineId}
+                  onCreate={(payload) => saveLineMutation.mutate(payload as BusinessLinePayload)}
+                  onDelete={(id) => deleteLineMutation.mutate(id)}
+                  isBusy={saveLineMutation.isPending || deleteLineMutation.isPending}
+                />
+                {selectedLineId && (
+                  <MemberList
+                    members={membersQuery.data ?? []}
+                    selectedMemberId={selectedMember?.id || null}
+                    onSelect={setSelectedMember}
+                    onCreate={handleCreateMember}
+                    onUpdate={handleUpdateMember}
+                    onDelete={handleDeleteMember}
+                    onUpdateCount={handleUpdateMemberCount}
+                    onUpdateAllCounts={handleUpdateAllMembersCount}
+                    isBusy={
+                      createMemberMutation.isPending ||
+                      updateMemberMutation.isPending ||
+                      deleteMemberMutation.isPending
+                    }
+                  />
+                )}
+              </div>
+              <main className="admin-main-content">
+                <UserTweetView
+                  tweets={userTweetsQuery.data?.records ?? []}
+                  total={userTweetsQuery.data?.total ?? 0}
+                  username={selectedMember?.twitter_id}
+                  range={timelineRange}
+                  onRangeChange={(value) => {
+                    setTimelineRange(value)
+                    setTimelinePage(1)
+                  }}
+                  typeFilter={timelineType}
+                  onTypeFilterChange={(value) => {
+                    setTimelineType(value)
+                    setTimelinePage(1)
+                  }}
+                  page={timelinePage}
+                  onPageChange={setTimelinePage}
+                  pageSize={timelinePageSize}
+                  onPageSizeChange={(value) => {
+                    setTimelinePageSize(value)
+                    setTimelinePage(1)
+                  }}
+                  isLoading={userTweetsQuery.isLoading || userTweetsQuery.isFetching}
+                />
+              </main>
+            </div>
+          }
+        />
+        <Route path="reports/generate" element={<ReportGenerator />} />
+        <Route path="reports" element={<ReportList />} />
+      </Routes>
     </div>
   )
 }
