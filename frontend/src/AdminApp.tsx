@@ -20,7 +20,6 @@ import {
   fetchMembers,
   fetchUserTweets,
   saveBusinessLine,
-  triggerAnalysis,
   updateMember,
   updateMemberTweetCount,
   updateAllMembersTweetCount,
@@ -156,12 +155,6 @@ function AdminApp() {
     },
   })
 
-  const triggerAnalysisMutation = useMutation({
-    mutationFn: ({ lineId }: { lineId: string }) => triggerAnalysis(lineId),
-    onSuccess: () => {
-      alert('Analysis completed and saved as snapshot!')
-    },
-  })
 
   const handleCreateMember = (payload: MemberCreate) => {
     if (!selectedLineId) return
@@ -178,12 +171,6 @@ function AdminApp() {
     }
   }
 
-  const handleTriggerAnalysis = () => {
-    if (!selectedLineId) return
-    if (confirm('Generate analysis snapshot for this business line?')) {
-      triggerAnalysisMutation.mutate({ lineId: selectedLineId })
-    }
-  }
 
   const handleUpdateMemberCount = async (memberId: string) => {
     try {
@@ -243,7 +230,7 @@ function AdminApp() {
                 fontWeight: isReportGeneratorPage ? 'bold' : 'normal',
               }}
             >
-              Generate Analysis
+              Generate Report
             </Link>
             <Link
               to="/admin/reports"
@@ -253,7 +240,7 @@ function AdminApp() {
                 fontWeight: isReportListPage ? 'bold' : 'normal',
               }}
             >
-              Analysis Management
+              Analysis History
             </Link>
           </nav>
           <button className="link-button" type="button" onClick={logout}>

@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -11,6 +11,7 @@ from ..schemas.insights import (
     InsightSnapshotPublic,
     InsightsResponse,
 )
+from ..schemas.tweet import TweetRecord
 from ..services.biz_meta import BusinessLineService
 from ..services.insight_snapshot_service import InsightSnapshotService
 from ..services.insights_service import InsightsService
@@ -213,7 +214,52 @@ async def get_public_snapshot(
     return await snapshot_service.get_snapshot(snapshot_id)
 
 
-@public_router.get("/snapshots/{snapshot_id}/tweets", response_model=list)
+def _parse_dt(value: Any) -> datetime:
+    """Parse datetime from various formats."""
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        if value.endswith("Z"):
+            value = value.replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            pass
+    return datetime.utcnow()
+
+
+def _to_tweet_record(doc: Dict[str, Any], business_line: str) -> TweetRecord:
+    """Convert MongoDB document to TweetRecord, handling ObjectId conversion."""
+    from bson import ObjectId
+    
+    # Convert ObjectId to string if present
+    doc_id = doc.get("id", "")
+    if not doc_id and doc.get("_id"):
+        doc_id = str(doc.get("_id"))
+    
+    return TweetRecord(
+        id=doc_id,
+        author=doc.get("author", ""),
+        username=doc.get("username", ""),
+        content=doc.get("content", ""),
+        created_at=_parse_dt(doc.get("created_at")),
+        image=doc.get("image"),
+        language=doc.get("language"),
+        like_count=doc.get("like_count", 0),
+        retweet_count=doc.get("retweet_count", 0),
+        is_quoted=doc.get("is_quoted", False),
+        is_reply=doc.get("is_reply", False),
+        is_retweet=doc.get("is_retweet", False),
+        original_author=doc.get("original_author"),
+        original_content=doc.get("original_content"),
+        original_id=doc.get("original_id"),
+        original_conversationId=doc.get("original_conversationId"),
+        url=doc.get("url"),
+        business_line=business_line,
+    )
+
+
+@public_router.get("/snapshots/{snapshot_id}/tweets", response_model=List[TweetRecord])
 async def get_snapshot_related_tweets(
     snapshot_id: str,
     node_id: str = Query(..., description="Node ID (e.g., 'user:username' or 'topic:TopicName')"),
@@ -241,22 +287,51 @@ async def get_snapshot_related_tweets(
     if node_id.startswith("user:"):
         # Filter by username
         username = node_id.replace("user:", "")
-        related_tweets = [
-            doc
-            for doc in all_docs
-            if (doc.get("username") == username or doc.get("author") == username)
-        ]
+        # Use a set to track seen tweet IDs to avoid duplicates
+        seen_ids = set()
+        related_tweets = []
+        for doc in all_docs:
+            if (doc.get("username") == username or doc.get("author") == username):
+                doc_id = str(doc.get("_id", "")) or str(doc.get("id", ""))
+                # Only add if we haven't seen this tweet ID before
+                if doc_id and doc_id not in seen_ids:
+                    seen_ids.add(doc_id)
+                    related_tweets.append(doc)
     elif node_id.startswith("topic:"):
-        # Filter by topic keywords in content
+        # Filter by topic - use LLM-provided tweet IDs if available
         topic_name = node_id.replace("topic:", "")
-        topic_lower = topic_name.lower()
-        related_tweets = [
-            doc
-            for doc in all_docs
-            if topic_lower in (doc.get("content", "") or "").lower()
-        ]
+        # Find topic in snapshot
+        topic = next((t for t in snapshot.topics if t.topic == topic_name), None)
+        if topic and hasattr(topic, 'related_tweet_ids') and topic.related_tweet_ids:
+            # Use LLM-provided tweet IDs
+            # Create a set of valid tweet ID strings for comparison
+            valid_tweet_ids = set(topic.related_tweet_ids)
+            # Use a set to track seen tweet IDs to avoid duplicates
+            seen_ids = set()
+            related_tweets = []
+            for doc in all_docs:
+                doc_id = str(doc.get("_id", "")) or str(doc.get("id", ""))
+                # Check if this tweet ID matches any in valid_tweet_ids
+                if (doc_id in valid_tweet_ids or 
+                    str(doc.get("_id")) in valid_tweet_ids or 
+                    str(doc.get("id")) in valid_tweet_ids):
+                    # Only add if we haven't seen this tweet ID before
+                    if doc_id and doc_id not in seen_ids:
+                        seen_ids.add(doc_id)
+                        related_tweets.append(doc)
+        else:
+            # Fallback to keyword matching
+            topic_lower = topic_name.lower()
+            related_tweets = [
+                doc
+                for doc in all_docs
+                if topic_lower in (doc.get("content", "") or "").lower()
+            ]
 
     # Sort by created_at descending and limit
     related_tweets.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-    return related_tweets[:limit]
+    
+    # Convert to TweetRecord to handle ObjectId serialization
+    records = [_to_tweet_record(doc, line.name) for doc in related_tweets[:limit]]
+    return records
 

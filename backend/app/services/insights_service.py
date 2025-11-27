@@ -81,16 +81,47 @@ class InsightsService:
             if twitter_id in member_descriptions:
                 username_to_desc[username] = member_descriptions[twitter_id]
 
+        # Create a mapping of tweet IDs to documents for validation
+        tweet_id_to_doc = {}
+        for idx, doc in enumerate(docs):
+            tweet_id = None
+            if "_id" in doc:
+                tweet_id = str(doc["_id"])
+            elif "id" in doc:
+                tweet_id = str(doc["id"])
+            else:
+                tweet_id = f"tweet_{idx}"
+            tweet_id_to_doc[tweet_id] = doc
+
         # Analyze topics using LLM
         topic_data = await self.llm_client.analyze_topics(docs, username_to_desc)
-        topic_summaries = [
-            TopicSummary(
-                topic=item.get("topic", "Unknown"),
-                summary=item.get("summary", ""),
-                score=float(item.get("score", 0.5)),
+        topic_summaries = []
+        for item in topic_data:
+            # Extract and validate related tweet IDs
+            related_tweet_ids = item.get("related_tweet_ids", [])
+            if not isinstance(related_tweet_ids, list):
+                related_tweet_ids = []
+            # Filter to only include IDs that exist in our documents
+            valid_tweet_ids = [
+                tid for tid in related_tweet_ids
+                if tid in tweet_id_to_doc
+            ]
+            
+            # Extract related user IDs
+            related_user_ids = item.get("related_user_ids", [])
+            if not isinstance(related_user_ids, list):
+                related_user_ids = []
+            
+            topic_summaries.append(
+                TopicSummary(
+                    topic=item.get("topic", "Unknown"),
+                    summary=item.get("summary", ""),
+                    score=float(item.get("score", 0.5)),
+                    sentiment=item.get("sentiment"),
+                    related_tweet_ids=valid_tweet_ids,
+                    related_user_ids=related_user_ids,
+                )
             )
-            for item in topic_data
-        ]
 
         # Analyze key persons using LLM
         key_person_data = await self.llm_client.analyze_key_persons(docs, username_to_desc)
@@ -133,6 +164,15 @@ class InsightsService:
             target = rel.get("target", "")
             strength = float(rel.get("strength", 0.5))
             relationship_type = rel.get("relationship_type", "")
+            sentiment = rel.get("sentiment")
+            related_tweet_ids = rel.get("related_tweet_ids", [])
+            if not isinstance(related_tweet_ids, list):
+                related_tweet_ids = []
+            # Validate tweet IDs
+            valid_related_tweet_ids = [
+                tid for tid in related_tweet_ids
+                if tid in tweet_id_to_doc
+            ]
             
             if source and target:
                 # Determine node IDs based on relationship type and source/target format
@@ -160,6 +200,33 @@ class InsightsService:
                             source=source_id,
                             target=target_id,
                             weight=strength,
+                            relationship_type=relationship_type if relationship_type else None,
+                            sentiment=sentiment,
+                            related_tweet_ids=valid_related_tweet_ids,
+                        )
+                    )
+
+        # Add user-topic edges based on LLM's related_user_ids in TopicSummary
+        # This ensures all topics are connected to their related users
+        existing_user_topic_edges = {
+            (e.source, e.target) for e in edges
+            if e.source.startswith("user:") and e.target.startswith("topic:")
+        }
+        
+        for topic in topic_summaries:
+            target_id = f"topic:{topic.topic}"
+            for username in topic.related_user_ids:
+                source_id = f"user:{username}"
+                # Only add edge if both nodes exist and edge doesn't already exist
+                if (source_id in valid_node_ids and target_id in valid_node_ids and 
+                    (source_id, target_id) not in existing_user_topic_edges):
+                    edges.append(
+                        GraphEdge(
+                            source=source_id,
+                            target=target_id,
+                            weight=topic.score * 0.8,  # Weight based on topic score
+                            relationship_type="topic_discussion",
+                            related_tweet_ids=topic.related_tweet_ids[:5],  # Include some tweet IDs
                         )
                     )
 
@@ -173,12 +240,7 @@ class InsightsService:
                 if topic_lower in content:
                     user_topic_counts[(username, topic.topic)] += 1
 
-        # Only add user-topic edges if they don't already exist from LLM relationships
-        existing_user_topic_edges = {
-            (e.source, e.target) for e in edges
-            if e.source.startswith("user:") and e.target.startswith("topic:")
-        }
-        
+        # Only add user-topic edges if they don't already exist
         for (username, topic_name), count in user_topic_counts.items():
             if username in user_weights:
                 source_id = f"user:{username}"
@@ -191,6 +253,7 @@ class InsightsService:
                             source=source_id,
                             target=target_id,
                             weight=min(count / 5.0, 1.0),
+                            relationship_type="topic_discussion",
                         )
                     )
 

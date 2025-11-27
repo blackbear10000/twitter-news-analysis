@@ -15,12 +15,21 @@ class GraphEdge(BaseModel):
     source: str
     target: str
     weight: float = Field(ge=0)
+    relationship_type: Optional[str] = Field(None, description="Type: 'retweet', 'reply', 'quote', 'mention', 'topic_discussion', 'collaboration'")
+    sentiment: Optional[str] = Field(None, description="Sentiment: 'support', 'oppose', 'neutral'")
+    # For topic-related edges, store related tweet IDs
+    related_tweet_ids: List[str] = Field(default_factory=list, description="Tweet IDs that establish this relationship")
 
 
 class TopicSummary(BaseModel):
     topic: str
     summary: str
     score: float
+    sentiment: Optional[str] = Field(None, description="Sentiment: 'positive', 'negative', 'neutral'")
+    # Store associated tweet IDs for direct linking
+    related_tweet_ids: List[str] = Field(default_factory=list, description="Tweet IDs related to this topic")
+    # Store associated user IDs for graph connections
+    related_user_ids: List[str] = Field(default_factory=list, description="User IDs who discussed this topic")
 
 
 class InsightsResponse(BaseModel):

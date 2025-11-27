@@ -269,7 +269,7 @@ export const ReportGenerator = () => {
 
           <div style={{ marginBottom: '2rem' }}>
             <div style={{ marginBottom: '0.5rem', color: '#64748b', fontSize: '0.875rem' }}>
-              <span>ℹ️ Date range is limited to a maximum of 7 days</span>
+              <span>Note: Date range is limited to a maximum of 7 days</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>

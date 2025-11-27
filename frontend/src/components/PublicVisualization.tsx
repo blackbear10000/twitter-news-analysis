@@ -49,6 +49,63 @@ export const PublicVisualization = () => {
 
   const snapshot: InsightSnapshot | null = snapshotQuery.data || null
 
+  // Build topic score map and filter out persons not connected to topics
+  const topicScoreMap = useMemo(() => {
+    if (!snapshot) return new Map<string, number>()
+    const map = new Map<string, number>()
+    snapshot.topics.forEach((topic) => {
+      map.set(`topic:${topic.topic}`, topic.score)
+    })
+    return map
+  }, [snapshot])
+
+  // Get set of person IDs that are connected to at least one topic
+  const personsConnectedToTopics = useMemo(() => {
+    if (!snapshot) return new Set<string>()
+    const connected = new Set<string>()
+    snapshot.edges.forEach((edge) => {
+      if (edge.source.startsWith('user:') && edge.target.startsWith('topic:')) {
+        connected.add(edge.source)
+      }
+    })
+    return connected
+  }, [snapshot])
+
+  // Count topic connections for each person
+  const personTopicConnectionCount = useMemo(() => {
+    if (!snapshot) return new Map<string, number>()
+    const counts = new Map<string, number>()
+    snapshot.edges.forEach((edge) => {
+      if (edge.source.startsWith('user:') && edge.target.startsWith('topic:')) {
+        const current = counts.get(edge.source) || 0
+        counts.set(edge.source, current + 1)
+      }
+    })
+    return counts
+  }, [snapshot])
+
+  // Memoize nodes and edges to prevent unnecessary Graph re-renders
+  // Filter out persons not connected to any topic
+  const graphNodes = useMemo(() => {
+    if (!snapshot) return []
+    return snapshot.nodes.filter((node) => {
+      if (node.type === 'topic') return true
+      if (node.type === 'user') {
+        return personsConnectedToTopics.has(node.id)
+      }
+      return true
+    })
+  }, [snapshot?.id, personsConnectedToTopics]) // Only change when snapshot ID changes
+
+  const graphEdges = useMemo(() => {
+    if (!snapshot) return []
+    // Filter edges to only include those where both nodes are in the filtered graphNodes
+    const validNodeIds = new Set(graphNodes.map((n) => n.id))
+    return snapshot.edges.filter(
+      (edge) => validNodeIds.has(edge.source) && validNodeIds.has(edge.target)
+    )
+  }, [snapshot?.id, graphNodes]) // Only change when snapshot ID changes
+
   // Get unique business lines from snapshots
   const businessLinesMap = new Map<string, { id: string; name: string }>()
   snapshotsQuery.data?.forEach((s) => {
@@ -67,14 +124,14 @@ export const PublicVisualization = () => {
     return [...snapshot.topics].sort((a, b) => b.score - a.score).slice(0, 10)
   }, [snapshot])
 
-  // Get top key persons (sorted by weight)
+  // Get top key persons (sorted by weight) - only those connected to topics
   const topKeyPersons = useMemo(() => {
     if (!snapshot) return []
     return snapshot.nodes
-      .filter((node) => node.type === 'user')
+      .filter((node) => node.type === 'user' && personsConnectedToTopics.has(node.id))
       .sort((a, b) => b.weight - a.weight)
       .slice(0, 10)
-  }, [snapshot])
+  }, [snapshot, personsConnectedToTopics])
 
   // Build topic-user relationships
   const topicUserRelations = useMemo(() => {
@@ -104,7 +161,9 @@ export const PublicVisualization = () => {
   const personRelations = useMemo(() => {
     if (!snapshot) return new Map<string, PersonRelation>()
     const relations = new Map<string, PersonRelation>()
-    const users = snapshot.nodes.filter((node) => node.type === 'user')
+    const users = snapshot.nodes.filter(
+      (node) => node.type === 'user' && personsConnectedToTopics.has(node.id)
+    )
     users.forEach((user) => {
       const userId = user.id
       const relatedTopics: Array<{ topic: string; weight: number }> = []
@@ -128,7 +187,7 @@ export const PublicVisualization = () => {
       }
     })
     return relations
-  }, [snapshot])
+  }, [snapshot, personsConnectedToTopics])
 
   return (
     <div className="app-shell public-shell">
@@ -213,8 +272,10 @@ export const PublicVisualization = () => {
               <div className="public-view-layout-single">
                 <div className="public-graph-main-full">
                   <Graph
-                    nodes={snapshot.nodes}
-                    edges={snapshot.edges}
+                    nodes={graphNodes}
+                    edges={graphEdges}
+                    topicScoreMap={topicScoreMap}
+                    personTopicConnectionCount={personTopicConnectionCount}
                     highlightedNodeId={highlightedNodeId}
                     onNodeClick={(nodeId) => {
                       if (nodeId) {
@@ -261,7 +322,14 @@ export const PublicVisualization = () => {
                             >
                               <div className="topic-detail-header">
                                 <strong className="topic-detail-title">{topic.topic}</strong>
-                                <span className="badge badge-small">Score {topic.score.toFixed(1)}</span>
+                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                  {topic.sentiment && (
+                                    <span className={`badge badge-small badge-sentiment badge-${topic.sentiment}`}>
+                                      {topic.sentiment}
+                                    </span>
+                                  )}
+                                  <span className="badge badge-small">Score {topic.score.toFixed(1)}</span>
+                                </div>
                               </div>
                               <p className="topic-detail-summary">{topic.summary}</p>
                               {relatedUsers.length > 0 && (

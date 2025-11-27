@@ -106,14 +106,70 @@ export const ReportList = () => {
     return [...selectedSnapshot.topics].sort((a, b) => b.score - a.score).slice(0, 10)
   }, [selectedSnapshot])
 
-  // Get top key persons (sorted by weight)
+  // Build topic score map
+  const topicScoreMap = useMemo(() => {
+    if (!selectedSnapshot) return new Map<string, number>()
+    const map = new Map<string, number>()
+    selectedSnapshot.topics.forEach((topic) => {
+      map.set(`topic:${topic.topic}`, topic.score)
+    })
+    return map
+  }, [selectedSnapshot])
+
+  // Get set of person IDs that are connected to at least one topic
+  const personsConnectedToTopics = useMemo(() => {
+    if (!selectedSnapshot) return new Set<string>()
+    const connected = new Set<string>()
+    selectedSnapshot.edges.forEach((edge) => {
+      if (edge.source.startsWith('user:') && edge.target.startsWith('topic:')) {
+        connected.add(edge.source)
+      }
+    })
+    return connected
+  }, [selectedSnapshot])
+
+  // Count topic connections for each person
+  const personTopicConnectionCount = useMemo(() => {
+    if (!selectedSnapshot) return new Map<string, number>()
+    const counts = new Map<string, number>()
+    selectedSnapshot.edges.forEach((edge) => {
+      if (edge.source.startsWith('user:') && edge.target.startsWith('topic:')) {
+        const current = counts.get(edge.source) || 0
+        counts.set(edge.source, current + 1)
+      }
+    })
+    return counts
+  }, [selectedSnapshot])
+
+  // Filter nodes to only include persons connected to topics
+  const filteredNodes = useMemo(() => {
+    if (!selectedSnapshot) return []
+    return selectedSnapshot.nodes.filter((node) => {
+      if (node.type === 'topic') return true
+      if (node.type === 'user') {
+        return personsConnectedToTopics.has(node.id)
+      }
+      return true
+    })
+  }, [selectedSnapshot, personsConnectedToTopics])
+
+  // Filter edges to only include those with valid nodes
+  const filteredEdges = useMemo(() => {
+    if (!selectedSnapshot) return []
+    const validNodeIds = new Set(filteredNodes.map((n) => n.id))
+    return selectedSnapshot.edges.filter(
+      (edge) => validNodeIds.has(edge.source) && validNodeIds.has(edge.target)
+    )
+  }, [selectedSnapshot, filteredNodes])
+
+  // Get top key persons (sorted by weight) - only those connected to topics
   const topKeyPersons = useMemo(() => {
     if (!selectedSnapshot) return []
     return selectedSnapshot.nodes
-      .filter((node) => node.type === 'user')
+      .filter((node) => node.type === 'user' && personsConnectedToTopics.has(node.id))
       .sort((a, b) => b.weight - a.weight)
       .slice(0, 10)
-  }, [selectedSnapshot])
+  }, [selectedSnapshot, personsConnectedToTopics])
 
   // Build topic-user relationships
   const topicUserRelations = useMemo(() => {
@@ -143,7 +199,9 @@ export const ReportList = () => {
   const personRelations = useMemo(() => {
     if (!selectedSnapshot) return new Map<string, PersonRelation>()
     const relations = new Map<string, PersonRelation>()
-    const users = selectedSnapshot.nodes.filter((node) => node.type === 'user')
+    const users = selectedSnapshot.nodes.filter(
+      (node) => node.type === 'user' && personsConnectedToTopics.has(node.id)
+    )
     users.forEach((user) => {
       const userId = user.id
       const relatedTopics: Array<{ topic: string; weight: number }> = []
@@ -167,11 +225,11 @@ export const ReportList = () => {
       }
     })
     return relations
-  }, [selectedSnapshot])
+  }, [selectedSnapshot, personsConnectedToTopics])
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
-      <h1>Analysis Management</h1>
+      <h1>Analysis History</h1>
 
       <div style={{ marginBottom: '2rem' }}>
         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
@@ -315,12 +373,14 @@ export const ReportList = () => {
               <div className="public-view-layout-single">
                 <div className="public-graph-main-full">
                   <Graph
-                    nodes={selectedSnapshot.nodes}
-                    edges={selectedSnapshot.edges}
+                    nodes={filteredNodes}
+                    edges={filteredEdges}
+                    topicScoreMap={topicScoreMap}
+                    personTopicConnectionCount={personTopicConnectionCount}
                     highlightedNodeId={highlightedNodeId}
                     onNodeClick={(nodeId) => {
                       if (nodeId) {
-                        const node = selectedSnapshot.nodes.find((n) => n.id === nodeId)
+                        const node = filteredNodes.find((n) => n.id === nodeId)
                         if (node) {
                           setHighlightedNodeId(nodeId)
                           setSelectedNodeForTweets({
@@ -363,7 +423,14 @@ export const ReportList = () => {
                             >
                               <div className="topic-detail-header">
                                 <strong className="topic-detail-title">{topic.topic}</strong>
-                                <span className="badge badge-small">Score {topic.score.toFixed(1)}</span>
+                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                  {topic.sentiment && (
+                                    <span className={`badge badge-small badge-sentiment badge-${topic.sentiment}`}>
+                                      {topic.sentiment}
+                                    </span>
+                                  )}
+                                  <span className="badge badge-small">Score {topic.score.toFixed(1)}</span>
+                                </div>
                               </div>
                               <p className="topic-detail-summary">{topic.summary}</p>
                               {relatedUsers.length > 0 && (

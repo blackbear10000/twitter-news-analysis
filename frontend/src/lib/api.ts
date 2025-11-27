@@ -73,12 +73,18 @@ export interface GraphEdge {
   source: string
   target: string
   weight: number
+  relationship_type?: string | null
+  sentiment?: string | null
+  related_tweet_ids?: string[]
 }
 
 export interface TopicSummary {
   topic: string
   summary: string
   score: number
+  sentiment?: string | null
+  related_tweet_ids?: string[]
+  related_user_ids?: string[]
 }
 
 export interface InsightsResponse {

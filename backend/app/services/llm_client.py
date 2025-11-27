@@ -104,22 +104,35 @@ class LLMClient:
         self, tweets: List[Dict[str, Any]], member_descriptions: Dict[str, str]
     ) -> List[Dict[str, Any]]:
         """Use LLM to analyze topics from tweets."""
-        system_prompt = """You are an expert social media analyst. Analyze Twitter/X posts and identify key topics, themes, and trends. 
+        system_prompt = """You are an expert social media analyst. Analyze Twitter/X posts and identify key topics, themes, and trends.
 Return your analysis as a JSON array of objects, each with:
 - "topic": a concise topic name (2-5 words)
 - "summary": a brief explanation (1-2 sentences)
 - "score": a relevance score from 0.0 to 1.0
+- "sentiment": sentiment analysis ("positive", "negative", or "neutral")
+- "related_tweet_ids": array of tweet IDs (from the input) that are most relevant to this topic
+- "related_user_ids": array of usernames who actively discussed this topic
 
-Focus on identifying meaningful themes, not just hashtags. Consider context and member descriptions when available."""
+Focus on identifying meaningful themes, not just hashtags. Consider context and member descriptions when available.
+For related_tweet_ids, select the most representative tweets (5-10 per topic)."""
         tweet_texts = []
-        for tweet in tweets[:100]:  # Limit to avoid token limits
+        for idx, tweet in enumerate(tweets[:100]):  # Limit to avoid token limits
+            # Extract tweet ID - try multiple possible fields
+            tweet_id = None
+            if "_id" in tweet:
+                tweet_id = str(tweet["_id"])
+            elif "id" in tweet:
+                tweet_id = str(tweet["id"])
+            else:
+                tweet_id = f"tweet_{idx}"
+            
             username = tweet.get("username") or tweet.get("author", "unknown")
             content = tweet.get("content", "")
             desc = member_descriptions.get(username, "")
             if desc:
-                tweet_texts.append(f"[{username} ({desc})]: {content}")
+                tweet_texts.append(f"[ID:{tweet_id}] [{username} ({desc})]: {content}")
             else:
-                tweet_texts.append(f"[{username}]: {content}")
+                tweet_texts.append(f"[ID:{tweet_id}] [{username}]: {content}")
         prompt = f"""Analyze the following Twitter posts and identify the top 5-8 key topics:
 
 {chr(10).join(tweet_texts)}
@@ -151,13 +164,34 @@ Return only valid JSON array, no additional text."""
         system_prompt = """You are an expert network analyst. Analyze Twitter/X posts to identify key persons (users) and their relationships/interactions.
 Return your analysis as a JSON object with:
 - "key_persons": array of objects with "username", "role_description", "importance_score" (0.0-1.0)
-- "relationships": array of objects with "source", "target", "relationship_type", "strength" (0.0-1.0), "sentiment" (optional: "support", "oppose", "neutral")
+- "relationships": array of objects with:
+  - "source": source username
+  - "target": target username or topic name
+  - "relationship_type": one of "retweet", "reply", "quote", "mention", "topic_discussion", "collaboration"
+  - "strength": relationship strength (0.0-1.0)
+  - "sentiment": optional sentiment ("support", "oppose", "neutral")
+  - "related_tweet_ids": array of tweet IDs that establish this relationship
 
-Relationship types can be: "retweet", "reply", "quote", "mention", "topic_discussion", "collaboration", etc.
-Consider retweets, replies, quotes, mentions, content themes, and sentiment (support/oppose) when identifying relationships.
-For topic relationships, connect users who discuss the same topics, especially if they show agreement or disagreement."""
+Relationship types:
+- "retweet": direct retweet relationship
+- "reply": direct reply relationship
+- "quote": quote tweet relationship
+- "mention": user mentioned in tweet
+- "topic_discussion": users discussing the same topic (indirect relationship)
+- "collaboration": users showing collaborative behavior
+
+For topic_discussion relationships, connect users who discuss the same topics, especially if they show agreement or disagreement."""
         tweet_texts = []
-        for tweet in tweets[:100]:
+        for idx, tweet in enumerate(tweets[:100]):
+            # Extract tweet ID
+            tweet_id = None
+            if "_id" in tweet:
+                tweet_id = str(tweet["_id"])
+            elif "id" in tweet:
+                tweet_id = str(tweet["id"])
+            else:
+                tweet_id = f"tweet_{idx}"
+            
             username = tweet.get("username") or tweet.get("author", "unknown")
             content = tweet.get("content", "")
             desc = member_descriptions.get(username, "")
@@ -177,9 +211,9 @@ For topic relationships, connect users who discuss the same topics, especially i
             interaction_str = " | ".join(interaction_info) if interaction_info else ""
             
             if desc:
-                tweet_texts.append(f"[{username} ({desc})]{' ' + interaction_str + ' ' if interaction_str else ''}: {content}")
+                tweet_texts.append(f"[ID:{tweet_id}] [{username} ({desc})]{' ' + interaction_str + ' ' if interaction_str else ''}: {content}")
             else:
-                tweet_texts.append(f"[{username}]{' ' + interaction_str + ' ' if interaction_str else ''}: {content}")
+                tweet_texts.append(f"[ID:{tweet_id}] [{username}]{' ' + interaction_str + ' ' if interaction_str else ''}: {content}")
         prompt = f"""Analyze the following Twitter posts to identify key persons and their relationships.
 Pay special attention to:
 1. Retweet relationships: who retweets whom (indicates support/amplification)
