@@ -241,9 +241,8 @@ export const Graph = ({
         }
       })
 
-    // Draw labels - set initial positions immediately (inside rotation container)
-    // Position labels based on node radius to avoid overlap
-    const labelGroup = rotationContainer.append('g').attr('class', 'labels')
+    // Draw labels - keep them out of rotation container so they remain readable
+    const labelGroup = container.append('g').attr('class', 'labels')
     const labels = labelGroup
       .selectAll('text')
       .data(simNodes)
@@ -253,18 +252,11 @@ export const Graph = ({
       .attr('font-size', 14)
       .attr('fill', '#e5e7eb')
       .attr('font-weight', 'normal')
-      .attr('x', 0) // Set to 0, position will be controlled by transform
-      .attr('y', 0) // Set to 0, position will be controlled by transform
-      .attr('text-anchor', 'start') // Align text to start
-      .attr('transform', (d: SimNode) => {
-        const radius = calculateNodeRadius(d)
-        const nodeX = (d.x ?? centerX) - centerX
-        const nodeY = (d.y ?? centerY) - centerY
-        return `translate(${nodeX + radius + 8}, ${nodeY + 5})`
-      })
+      .attr('text-anchor', 'start')
       .attr('data-node-id', (d: SimNode) => d.id) // Store node ID as data attribute
       .style('pointer-events', 'none')
       .style('user-select', 'none')
+      .attr('transform', `translate(${centerX}, ${centerY})`)
 
     // Tooltips
     node.append('title').text((d: SimNode) => `${d.label} (${d.type})\nWeight: ${d.weight.toFixed(2)}`)
@@ -298,14 +290,24 @@ export const Graph = ({
       return (d.y !== undefined && d.y !== null ? d.y : centerY) - centerY
     })
 
-    // Update label positions - use dynamic radius to avoid overlap (relative to center)
-    // Position is controlled by transform, rotation will be applied in animate function
-    labels.attr('transform', (d: SimNode) => {
-      const radius = calculateNodeRadius(d)
-      const nodeX = (d.x !== undefined && d.x !== null ? d.x : centerX) - centerX
-      const nodeY = (d.y !== undefined && d.y !== null ? d.y : centerY) - centerY
-      return `translate(${nodeX + radius + 8}, ${nodeY + 5})`
-    })
+    const updateLabelPositions = (angleDegrees: number) => {
+      const angle = (angleDegrees * Math.PI) / 180
+      const cosA = Math.cos(angle)
+      const sinA = Math.sin(angle)
+
+      labels.attr('transform', (d: SimNode) => {
+        const radius = calculateNodeRadius(d)
+        const relX = (d.x ?? centerX) - centerX
+        const relY = (d.y ?? centerY) - centerY
+        const rotatedX = relX * cosA - relY * sinA
+        const rotatedY = relX * sinA + relY * cosA
+        const absX = centerX + rotatedX
+        const absY = centerY + rotatedY
+        return `translate(${absX + radius + 8}, ${absY + 5})`
+      })
+    }
+
+    updateLabelPositions(rotationRef.current)
 
     // Save positions
     simNodes.forEach((n) => {
@@ -328,13 +330,7 @@ export const Graph = ({
       const center = centerRef.current
       if (center) {
         rotationContainer.attr('transform', `translate(${center.x}, ${center.y}) rotate(${rotationRef.current})`)
-        // Apply reverse rotation to labels to keep them horizontal
-        labels.attr('transform', (d: SimNode) => {
-          const nodeX = (d.x ?? center.x) - center.x
-          const nodeY = (d.y ?? center.y) - center.y
-          const radius = calculateNodeRadius(d)
-          return `translate(${nodeX + radius + 8}, ${nodeY + 5}) rotate(${-rotationRef.current})`
-        })
+        updateLabelPositions(rotationRef.current)
       }
 
       animationFrameRef.current = requestAnimationFrame(animate)
