@@ -82,8 +82,25 @@ Environment variables (can be placed in `frontend/.env`):
 | `VITE_PREVIEW_PORT` | Frontend preview server port | `4173` |
 | `VITE_PREVIEW_HOST` | Frontend preview server host | `localhost` |
 | `VITE_API_BASE_URL` | Backend API base URL | `http://localhost:8000` |
+| `VITE_ALLOWED_HOSTS` | Comma-separated list of hostnames allowed to access the dev server (e.g. `news.snzdata.com,localhost`) | _(empty)_ |
 
 **Note**: Vite recognizes `PORT` environment variable by default. You can use either `PORT` or `VITE_PORT` to configure the dev server port.
+
+### Running the frontend with PM2
+
+When running the dev server under PM2, start the Vite binary directly so that PM2 manages the actual process (otherwise the spawned `node_modules/.bin/vite` process can outlive PM2):
+
+```bash
+cd frontend
+PORT=6000 pm2 start ./node_modules/vite/bin/vite.js --name frontend-dev -- \
+  --host 0.0.0.0 --port ${PORT}
+
+# allow custom hostnames (e.g. news.snzdata.com)
+PORT=6000 VITE_ALLOWED_HOSTS="news.snzdata.com,localhost" pm2 restart frontend-dev
+```
+
+Stopping the PM2 process will now terminate the Vite server cleanly.  
+Because `strictPort` is enabled in `vite.config.ts`, Vite will exit with an error if the chosen port is already occupied, helping you detect orphaned processes quickly.
 
 ## Docker Compose
 
