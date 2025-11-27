@@ -21,15 +21,18 @@ services:
     build:
       context: ./backend
     environment:
-      - SECRET_KEY=change-me-secret
+      - ENVIRONMENT=production
+      - SERVER_PORT=${SERVER_PORT:-8000}
+      - SERVER_HOST=${SERVER_HOST:-0.0.0.0}
+      - SECRET_KEY=${SECRET_KEY:-change-me-secret}
       - MONGO_TWITTER_URI=mongodb://mongo-twitter:27017
       - MONGO_BIZ_URI=mongodb://mongo-biz:27017
-      - MONGO_TWITTER_DB=twitter_data
-      - MONGO_BIZ_DB=biz_meta
-      - DEFAULT_ADMIN_USERNAME=admin
-      - DEFAULT_ADMIN_PASSWORD=ChangeMe123!
+      - MONGO_TWITTER_DB=${MONGO_TWITTER_DB:-twitter_data}
+      - MONGO_BIZ_DB=${MONGO_BIZ_DB:-biz_meta}
+      - DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME:-admin}
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-ChangeMe123!}
     ports:
-      - '8000:8000'
+      - '${SERVER_PORT:-8000}:${SERVER_PORT:-8000}'
     depends_on:
       - mongo-twitter
       - mongo-biz
@@ -38,9 +41,11 @@ services:
     build:
       context: ./frontend
     environment:
-      - VITE_API_BASE_URL=http://backend:8000
+      - VITE_PORT=${VITE_PORT:-5173}
+      - VITE_HOST=${VITE_HOST:-0.0.0.0}
+      - VITE_API_BASE_URL=http://backend:${SERVER_PORT:-8000}
     ports:
-      - '5173:5173'
+      - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
     depends_on:
       - backend
 

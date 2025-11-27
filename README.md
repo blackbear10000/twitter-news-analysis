@@ -22,13 +22,25 @@ A FastAPI + React system that ingests Twitter data from MongoDB, lets admins man
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+python run.py
+```
+
+Or using uvicorn directly (port will default to 8000):
+```bash
 uvicorn app.main:app --reload
+```
+
+To use a custom port with uvicorn:
+```bash
+uvicorn app.main:app --reload --port 9000
 ```
 
 Environment variables (can be placed in `backend/.env`):
 
 | Variable | Description | Default |
 | --- | --- | --- |
+| `SERVER_PORT` | Backend server port | `8000` |
+| `SERVER_HOST` | Backend server host | `0.0.0.0` |
 | `SECRET_KEY` | JWT signing secret | `change-me-secret` |
 | `MONGO_TWITTER_URI` | Connection string for tweet DB | `mongodb://localhost:27017` |
 | `MONGO_TWITTER_DB` | Tweet database name | `twitter_data` |
@@ -61,7 +73,15 @@ npm install
 npm run dev
 ```
 
-Set `VITE_API_BASE_URL` in `.env` (defaults to `http://localhost:8000`).
+Environment variables (can be placed in `frontend/.env`):
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `VITE_PORT` | Frontend dev server port | `5173` |
+| `VITE_HOST` | Frontend dev server host | `localhost` |
+| `VITE_PREVIEW_PORT` | Frontend preview server port | `4173` |
+| `VITE_PREVIEW_HOST` | Frontend preview server host | `localhost` |
+| `VITE_API_BASE_URL` | Backend API base URL | `http://localhost:8000` |
 
 ## Docker Compose
 
@@ -71,12 +91,28 @@ Run the full stack with Mongo (two instances), backend, and frontend:
 docker compose up --build
 ```
 
+You can customize ports by setting environment variables before running docker compose:
+
+```bash
+# Example: Change backend port to 9000 and frontend port to 6000
+export SERVER_PORT=9000
+export VITE_PORT=6000
+docker compose up --build
+```
+
+Or create a `.env` file in the project root:
+
+```env
+SERVER_PORT=9000
+VITE_PORT=6000
+```
+
 Services:
 
-- `mongo-twitter` – stores tweet collections.
-- `mongo-biz` – stores business line metadata and admin users.
-- `backend` – FastAPI service on `localhost:8000`.
-- `frontend` – Vite dev server on `localhost:5173`.
+- `mongo-twitter` – stores tweet collections (port 27017).
+- `mongo-biz` – stores business line metadata and admin users (port 27018).
+- `backend` – FastAPI service (default: `localhost:8000`, configurable via `SERVER_PORT`).
+- `frontend` – Vite dev server (default: `localhost:5173`, configurable via `VITE_PORT`).
 
 ## Key API Endpoints
 
