@@ -77,11 +77,13 @@ Environment variables (can be placed in `frontend/.env`):
 
 | Variable | Description | Default |
 | --- | --- | --- |
-| `VITE_PORT` | Frontend dev server port | `5173` |
+| `PORT` or `VITE_PORT` | Frontend dev server port | `5173` |
 | `VITE_HOST` | Frontend dev server host | `localhost` |
 | `VITE_PREVIEW_PORT` | Frontend preview server port | `4173` |
 | `VITE_PREVIEW_HOST` | Frontend preview server host | `localhost` |
 | `VITE_API_BASE_URL` | Backend API base URL | `http://localhost:8000` |
+
+**Note**: Vite recognizes `PORT` environment variable by default. You can use either `PORT` or `VITE_PORT` to configure the dev server port.
 
 ## Docker Compose
 

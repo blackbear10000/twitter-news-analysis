@@ -11,8 +11,14 @@ class Settings(BaseSettings):
     default_admin_password: str = Field(default="ChangeMe123!")
     
     # Server Configuration
-    server_port: int = Field(default=8000, description="Backend server port")
-    server_host: str = Field(default="0.0.0.0", description="Backend server host")
+    server_port: int = Field(
+        default=8000,
+        description="Backend server port",
+    )
+    server_host: str = Field(
+        default="0.0.0.0",
+        description="Backend server host",
+    )
 
     mongo_twitter_uri: str = Field(default="mongodb://localhost:27017")
     mongo_twitter_db: str = Field(default="twitter_data")

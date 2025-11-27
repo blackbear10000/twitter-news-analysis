@@ -10,5 +10,6 @@ COPY . .
 EXPOSE 5173
 
 # Use shell form to allow environment variable substitution
-CMD npm run dev -- --host 0.0.0.0 --port ${VITE_PORT:-5173}
+# Vite recognizes PORT env var, but we also pass it as --port flag
+CMD npm run dev -- --host 0.0.0.0 --port ${PORT:-5173}
 
